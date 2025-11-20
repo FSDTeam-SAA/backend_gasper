@@ -9,7 +9,6 @@ import wishlistRoute from "../route/wishlist.route.js";
 import chatRoute from "../route/chat.route.js";
 import orderRoute from "../route/order.route.js";
 import paymentRoute from "../route/payment.route.js";
-import dashboardRoute from "../route/dashboard.route.js";
 import reportRoute from "../route/report.route.js";
 
 const router = express.Router();
@@ -24,7 +23,6 @@ router.use("/wishlist", wishlistRoute);
 router.use("/chat", chatRoute);
 router.use("/order", orderRoute);
 router.use("/payment", paymentRoute);
-router.use("/dashboard", dashboardRoute);
 router.use("/report", reportRoute);
 
 export default router;
