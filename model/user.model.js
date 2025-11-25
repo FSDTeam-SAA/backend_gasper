@@ -21,6 +21,10 @@ const userSchema = new Schema(
       type: String,
       trim: true,
     },
+    storeName: {
+      type: String,
+      trim: true,
+    },
     phone: {
       type: String,
       trim: true,
@@ -37,9 +41,28 @@ const userSchema = new Schema(
       public_id: { type: String, default: "" },
       url: { type: String, default: "" },
     },
+    storeLogo: {
+      public_id: { type: String, default: "" },
+      url: { type: String, default: "" },
+    },
+    storeDescription: { type: String, trim: true },
+    tradeLicense: {
+      public_id: { type: String, default: "" },
+      url: { type: String, default: "" },
+    },
+    description: { type: String },
+    address: { type: String },
+    city: { type: String },
+    postalCode: { type: String },
+    country: { type: String },
+    taxId: { type: String },
+    passport: { type: String },
+    idCard: { type: String },
     nationality: { type: String },
-    address: {
+    vendorStatus: {
       type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "pending",
     },
     notifications: {
       type: Boolean,
@@ -48,10 +71,6 @@ const userSchema = new Schema(
     language: {
       type: String,
       default: "en",
-    },
-    country: {
-      type: String,
-      default: "Kuwait",
     },
 
     role: {

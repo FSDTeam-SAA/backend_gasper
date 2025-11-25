@@ -8,60 +8,194 @@ import { sendEmail } from "../utils/sendEmail.js";
 import { User } from "./../model/user.model.js";
 import { access } from "fs";
 
-export const register = catchAsync(async (req, res, next) => {
-  const { email, password, confirmPassword, role } = req.body;
+const generateVerificationCode = () => {
+  return Math.floor(1000 + Math.random() * 9000);
+};
 
-  if (!email || !password || !confirmPassword) {
-    return next(
-      new AppError(400, "Email, password, and confirm password are required")
-    );
+// export const register = catchAsync(async (req, res, next) => {
+//   const { email, password, confirmPassword, role } = req.body;
+
+//   if (!email || !password || !confirmPassword) {
+//     return next(
+//       new AppError(400, "Email, password, and confirm password are required")
+//     );
+//   }
+
+//   if (password !== confirmPassword) {
+//     return next(new AppError(400, "Passwords do not match"));
+//   }
+
+//   const existingUser = await User.findOne({ email });
+//   if (existingUser) {
+//     return next(new AppError(400, "Email already registered"));
+//   }
+
+//   const user = new User({
+//     email,
+//     password,
+//     role: role,
+//     isEmailVerified: false,
+// vendorStatus: role === "manager" ? "pending" : undefined,
+
+//   });
+
+//   const otp = generateVerificationCode().toString();
+//   const otpExpiry = Date.now() + 10 * 60 * 1000;
+
+//   user.resetPasswordOTP = otp;
+//   user.resetPasswordOTPExpiry = otpExpiry;
+//   await user.save();
+
+//   try {
+//     await sendOTP(email, otp);
+//   } catch (err) {
+//     return next(new AppError(500, "Failed to send OTP email"));
+//   }
+
+//   sendResponse(res, {
+//     statusCode: 201,
+//     success: true,
+//     message:
+//       "User registered successfully. Please verify the OTP sent to your email to complete registration.",
+//     data: {
+//       email: user.email,
+//       role: user.role,
+//     },
+//   });
+// });
+
+// export const login = catchAsync(async (req, res) => {
+//   const { email, password } = req.body;
+//   const user = await User.isUserExistsByEmail(email);
+//   if (!user) {
+//     throw new AppError(httpStatus.NOT_FOUND, "User not found");
+//   }
+//   if (
+//     user?.password &&
+//     !(await User.isPasswordMatched(password, user.password))
+//   ) {
+//     throw new AppError(httpStatus.FORBIDDEN, "Password is not correct");
+//   }
+//   if (!(await User.isOTPVerified(user._id))) {
+//     const otp = generateOTP();
+//     const jwtPayloadOTP = {
+//       otp: otp,
+//     };
+
+//     const otptoken = createToken(
+//       jwtPayloadOTP,
+//       process.env.OTP_SECRET,
+//       process.env.OTP_EXPIRE
+//     );
+//     user.verificationInfo.token = otptoken;
+//     await user.save();
+//     await sendEmail(user.email, "Registerd Account", `Your OTP is ${otp}`);
+
+//     return sendResponse(res, {
+//       statusCode: httpStatus.FORBIDDEN,
+//       success: false,
+//       message: "OTP is not verified, please verify your OTP",
+//       data: { email: user.email },
+//     });
+//   }
+//   const jwtPayload = {
+//     _id: user._id,
+//     email: user.email,
+//     role: user.role,
+//   };
+//   const accessToken = createToken(
+//     jwtPayload,
+//     process.env.JWT_ACCESS_SECRET,
+//     process.env.JWT_ACCESS_EXPIRES_IN
+//   );
+
+//   const refreshToken = createToken(
+//     jwtPayload,
+//     process.env.JWT_REFRESH_SECRET,
+//     process.env.JWT_REFRESH_EXPIRES_IN
+//   );
+
+//   user.refreshToken = refreshToken;
+//   let _user = await user.save();
+
+//   res.cookie("refreshToken", refreshToken, {
+//     secure: true,
+//     httpOnly: true,
+//     sameSite: "none",
+//     maxAge: 1000 * 60 * 60 * 24 * 365,
+//   });
+
+//   sendResponse(res, {
+//     statusCode: httpStatus.OK,
+//     success: true,
+//     message: "User Logged in successfully",
+//     data: {
+//       accessToken,
+//       refreshToken: refreshToken,
+//       role: user.role,
+//       _id: user._id,
+//       user: user,
+//     },
+//   });
+// });
+
+export const register = catchAsync(async (req, res) => {
+  const { name, email, role, password, confirmPassword } = req.body;
+
+  if (!email || !password) {
+    throw new AppError(httpStatus.FORBIDDEN, "Please fill in all fields");
   }
 
   if (password !== confirmPassword) {
-    return next(new AppError(400, "Passwords do not match"));
-  }
-
-  const existingUser = await User.findOne({ email });
-  if (existingUser) {
-    return next(new AppError(400, "Email already registered"));
-  }
-
-  const totalInterests = selectedInterests.length + customInterests.length;
-  if (totalInterests > 15) {
-    return next(
-      new AppError(400, "You can select or create a maximum of 15 interests")
+    throw new AppError(
+      httpStatus.FORBIDDEN,
+      "Password and confirm password do not match"
     );
   }
+  const checkUser = await User.findOne({ email: email });
+  if (checkUser)
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      "Email already exists, please try another email"
+    );
 
-  const user = new User({
+  const user = await User.create({
+    name,
     email,
     password,
-    role: role,
-    isEmailVerified: false,
+    verificationInfo: { token: "", verified: true },
+    role,
+    vendorStatus: role === "manager" ? "pending" : undefined,
   });
 
-  const otp = generateVerificationCode().toString();
-  const otpExpiry = Date.now() + 10 * 60 * 1000;
+  const jwtPayload = {
+    _id: user._id,
+    email: user.email,
+    role: user.role,
+  };
+  const accessToken = createToken(
+    jwtPayload,
+    process.env.JWT_ACCESS_SECRET,
+    process.env.JWT_ACCESS_EXPIRES_IN
+  );
 
-  user.resetPasswordOTP = otp;
-  user.resetPasswordOTPExpiry = otpExpiry;
+  const refreshToken = createToken(
+    jwtPayload,
+    process.env.JWT_REFRESH_SECRET,
+    process.env.JWT_REFRESH_EXPIRES_IN
+  );
+  user.refreshToken = refreshToken;
   await user.save();
+  user.accessToken = accessToken;
 
-  try {
-    await sendOTP(email, otp);
-  } catch (err) {
-    return next(new AppError(500, "Failed to send OTP email"));
-  }
+  const userObj = user.toObject();
+  userObj.accessToken = accessToken;
 
   sendResponse(res, {
-    statusCode: 201,
+    statusCode: httpStatus.OK,
     success: true,
-    message:
-      "User registered successfully. Please verify the OTP sent to your email to complete registration.",
-    data: {
-      email: user.email,
-      role: user.role,
-    },
+    message: "User registered successfully",
+    data: userObj,
   });
 });
 

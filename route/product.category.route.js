@@ -1,22 +1,20 @@
 import express from "express";
-
 import {
-  createCategory,
-  deleteCategory,
+  addCategory,
   getCategories,
   updateCategory,
-} from "../controller/product.category.controller.js";
-
-import upload from "../middleware/multer.middleware.js";
+  deleteCategory,
+  getCategoryTree,
+} from "../controller/category.controller.js";
 import { protect } from "../middleware/auth.middleware.js";
+import upload from "../middleware/multer.middleware.js";
 
 const router = express.Router();
 
-router.use(protect);
-
-router.get("/", getCategories);
-router.post("/", upload.single("image"), createCategory);
-router.put("/:categoryId", upload.single("image"), updateCategory);
-router.delete("/:categoryId", deleteCategory);
+router.post("/add", protect, upload.single("image"), addCategory);
+router.get("/", protect, getCategories);
+router.get("/tree/all", protect, getCategoryTree);
+router.put("/:id", protect, upload.single("image"), updateCategory);
+router.delete("/:id", protect, deleteCategory);
 
 export default router;

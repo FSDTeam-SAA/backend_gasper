@@ -1,195 +1,171 @@
+import httpStatus from "http-status";
+import { Product } from "../model/product.model.js";
+import { Category } from "../model/category.model.js";
+import { uploadOnCloudinary } from "../utils/commonMethod.js";
 import AppError from "../errors/AppError.js";
 import sendResponse from "../utils/sendResponse.js";
 import catchAsync from "../utils/catchAsync.js";
-import httpStatus from "http-status";
-import mongoose from "mongoose";
-import { Product } from "../model/product.model.js";
-import { ProductCategory } from "../model/product.category.model.js";
-import { uploadOnCloudinary } from "../utils/commonMethod.js";
+import { User } from "../model/user.model.js";
 
-export const createProduct = catchAsync(async (req, res) => {
-  let userId = req.user._id;
-  if (!userId)
-    throw new AppError(httpStatus.FORBIDDEN, "You need to pass the token");
+export const addProduct = catchAsync(async (req, res) => {
   const {
-    name,
+    title,
     description,
-    basePrice,
+    detailedDescription,
+    price,
+    colors,
     category,
-    options = [],
-    discountPercent = 0,
-    stock = 0,
-    variation,
+    sku,
+    stock,
   } = req.body;
+  const vendor = req.user._id;
 
-  if (!name || !description || !basePrice || !category)
-    throw new AppError(httpStatus.BAD_REQUEST, "Required fields missing");
+  // Validate vendor
+  const user = await User.findById(vendor);
+  if (
+    !user ||
+    (user.role !== "manager" && user.role !== "admin") ||
+    user.vendorStatus !== "approved"
+  ) {
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      "Only managers and admins with approved vendor status can add products"
+    );
+  }
 
-  if (!mongoose.Types.ObjectId.isValid(category))
+  // Validate category
+  const cat = await Category.findById(category);
+  if (!cat) {
     throw new AppError(httpStatus.BAD_REQUEST, "Invalid category");
+  }
 
-  const cat = await ProductCategory.findById(category);
-  if (!cat) throw new AppError(httpStatus.NOT_FOUND, "Category not found");
-
-  if (req.files?.length > 6)
-    throw new AppError(httpStatus.BAD_REQUEST, "Max 6 images");
-
-  const images = req.files
-    ? (
-        await Promise.all(req.files.map((f) => uploadOnCloudinary(f.buffer)))
-      ).map((u) => u.secure_url)
-    : [];
-
-  const parsedOptions = JSON.parse(options).map((opt) => ({
-    title: opt.title,
-    price: Number(opt.price),
-    quantityType: opt.quantityType,
-    stock: Number(opt.stock),
-  }));
-
-  const totalStock =
-    stock + parsedOptions.reduce((sum, opt) => sum + opt.stock, 0);
+  // Handle file uploads - FIXED
+  const photos = [];
+  if (req.files && req.files.photos) {
+    // req.files.photos is an array of files from the "photos" field
+    for (let file of req.files.photos) {
+      const upload = await uploadOnCloudinary(file.buffer);
+      photos.push({
+        public_id: upload.public_id,
+        url: upload.secure_url,
+      });
+    }
+  }
 
   const product = await Product.create({
-    name,
+    title,
     description,
-    basePrice: Number(basePrice),
+    detailedDescription,
+    price: parseFloat(price),
+    colors: colors ? colors.split(",").map((color) => color.trim()) : [],
+    photos,
     category,
-    options: parsedOptions,
-    discountPercent: Number(discountPercent),
-    stock: totalStock,
-    images,
-    variation,
+    vendor,
+    sku,
+    stock: stock ? parseInt(stock) : 0,
   });
 
   sendResponse(res, {
     statusCode: httpStatus.CREATED,
     success: true,
-    message: "Product created",
+    message: "Product added successfully",
     data: product,
   });
 });
 
 export const updateProduct = catchAsync(async (req, res) => {
-  let userId = req.user._id;
-  if (!userId)
-    throw new AppError(httpStatus.FORBIDDEN, "You need to pass the token");
-
-  const { productId } = req.params;
-
   const {
-    name,
+    title,
     description,
-    basePrice,
+    detailedDescription,
+    price,
+    colors,
     category,
-    options = [],
-    discountPercent = 0,
-    stock = 0,
+    sku,
+    stock,
   } = req.body;
-  if (!mongoose.Types.ObjectId.isValid(productId))
-    throw new AppError(httpStatus.BAD_REQUEST, "Invalid ID");
 
-  const product = await Product.findById(productId);
-  if (!product) throw new AppError(httpStatus.NOT_FOUND, "Not found");
-
-  if (category && !mongoose.Types.ObjectId.isValid(category))
-    throw new AppError(httpStatus.BAD_REQUEST, "Invalid category");
-
-  const cat = category
-    ? await ProductCategory.findById(category)
-    : product.category;
-
-  if (category && !cat)
-    throw new AppError(httpStatus.NOT_FOUND, "Category not found");
-
-  let images = product.images;
-  if (req.files) {
-    if (req.files.length > 6)
-      throw new AppError(httpStatus.BAD_REQUEST, "Max 6");
-    const uploads = await Promise.all(
-      req.files.map((f) => uploadOnCloudinary(f.buffer))
-    );
-    images = uploads.map((u) => u.secure_url);
+  const product = await Product.findById(req.params.id);
+  if (!product) {
+    throw new AppError(httpStatus.NOT_FOUND, "Product not found");
   }
 
-  const parsedOptions = JSON.parse(options).map((opt) => ({
-    title: opt.title,
-    price: Number(opt.price),
-    quantityType: opt.quantityType,
-    stock: Number(opt.stock),
-  }));
+  // Authorization check
+  if (
+    req.user.role === "manager" &&
+    product.vendor.toString() !== req.user._id.toString()
+  ) {
+    throw new AppError(
+      httpStatus.FORBIDDEN,
+      "Cannot update other vendor's product"
+    );
+  }
 
-  const totalStock =
-    stock + parsedOptions.reduce((sum, opt) => sum + opt.stock, 0);
+  // Handle file uploads - FIXED
+  let photos = product.photos; // Keep existing photos
+  if (req.files && req.files.photos) {
+    // Add new photos to existing ones
+    for (let file of req.files.photos) {
+      const upload = await uploadOnCloudinary(file.buffer);
+      photos.push({
+        public_id: upload.public_id,
+        url: upload.secure_url,
+      });
+    }
+  }
 
-  const updated = await Product.findByIdAndUpdate(
-    productId,
+  const updates = {
+    title,
+    description,
+    detailedDescription,
+    price: price ? parseFloat(price) : product.price,
+    colors: colors
+      ? colors.split(",").map((color) => color.trim())
+      : product.colors,
+    category: category || product.category,
+    sku: sku || product.sku,
+    stock: stock ? parseInt(stock) : product.stock,
+    photos,
+  };
+
+  const updatedProduct = await Product.findByIdAndUpdate(
+    req.params.id,
+    updates,
     {
-      name,
-      description,
-      basePrice: Number(basePrice),
-      category,
-      options: parsedOptions,
-      discountPercent: Number(discountPercent),
-      stock: totalStock,
-      images,
-    },
-    { new: true }
-  ).populate("category");
+      new: true,
+      runValidators: true,
+    }
+  )
+    .populate("category", "name path")
+    .populate("vendor", "name storeName");
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: "Updated",
-    data: updated,
+    message: "Product updated successfully",
+    data: updatedProduct,
   });
 });
 
 export const getProducts = catchAsync(async (req, res) => {
-  const {
-    search,
-    category,
-    priceFrom,
-    priceTo,
-    sort = "newest",
-    page = 1,
-    limit = 10,
-  } = req.query;
-
-  const query = { stock: { $gt: 0 } };
-
-  if (search) query.name = { $regex: search, $options: "i" };
-
-  if (category) {
-    const cat = await ProductCategory.findOne({
-      name: { $regex: `^${category}$`, $options: "i" },
-    });
-
-    if (cat) query.category = cat._id;
-    else throw new AppError(httpStatus.NOT_FOUND, "Category not found");
+  const { page = 1, limit = 10, category, search, vendor } = req.query;
+  const query = {};
+  if (category) query.category = category;
+  if (search) query.title = { $regex: search, $options: "i" };
+  if (req.user.role === "manager" && vendor !== req.user._id.toString()) {
+    throw new AppError(
+      httpStatus.FORBIDDEN,
+      "Cannot access other vendor products"
+    );
   }
-
-  const priceQ = {};
-  if (priceFrom) priceQ.$gte = Number(priceFrom);
-
-  if (priceTo) priceQ.$lte = Number(priceTo);
-
-  if (Object.keys(priceQ).length) query.basePrice = priceQ;
-
-  const sortObj =
-    sort === "priceLowToHigh"
-      ? { basePrice: 1 }
-      : sort === "priceHighToLow"
-      ? { basePrice: -1 }
-      : { createdAt: -1 };
-
-  const skip = (Number(page) - 1) * Number(limit);
+  if (vendor) query.vendor = vendor;
 
   const products = await Product.find(query)
-    .sort(sortObj)
-    .skip(skip)
-    .limit(Number(limit))
-    .populate("category", "name");
+    .populate("category", "name")
+    .populate("vendor", "name storeName") // Assuming manager has storeName field, add if needed
+    .limit(limit * 1)
+    .skip((page - 1) * limit)
+    .sort({ createdAt: -1 });
 
   const total = await Product.countDocuments(query);
 
@@ -197,74 +173,59 @@ export const getProducts = catchAsync(async (req, res) => {
     statusCode: httpStatus.OK,
     success: true,
     message: "Products fetched",
-    data: {
-      products,
-      pagination: { page: Number(page), limit: Number(limit), total },
-    },
+    data: { products, pagination: { total, page, limit } },
   });
 });
 
 export const getProductById = catchAsync(async (req, res) => {
-  const { productId } = req.params;
-  const product = await Product.findById(productId).populate(
-    "category",
-    "name"
-  );
+  const product = await Product.findById(req.params.id)
+    .populate("category", "name")
+    .populate("vendor", "name storeName email");
 
-  if (!product) throw new AppError(httpStatus.NOT_FOUND, "Not found");
-
-  const related = await Product.find({
-    category: product.category._id,
-    _id: { $ne: productId },
-    stock: { $gt: 0 },
-  })
-    .limit(8)
-    .populate("category");
+  if (!product) throw new AppError(httpStatus.NOT_FOUND, "Product not found");
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: "Product details",
-    data: { product, relatedProducts: related },
-  });
-});
-
-export const getCategoryProducts = catchAsync(async (req, res) => {
-  const { categoryId } = req.params;
-
-  if (!mongoose.Types.ObjectId.isValid(categoryId))
-    throw new AppError(httpStatus.BAD_REQUEST, "Invalid ID");
-
-  const products = await Product.find({
-    category: categoryId,
-    stock: { $gt: 0 },
-  })
-    .sort({ createdAt: -1 })
-    .populate("category");
-
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: "Category products",
-    data: products,
+    message: "Product fetched",
+    data: product,
   });
 });
 
 export const deleteProduct = catchAsync(async (req, res) => {
-  let userId = req.user._id;
-  if (!userId)
-    throw new AppError(httpStatus.FORBIDDEN, "You need to pass the token");
+  const product = await Product.findByIdAndDelete(req.params.id);
 
-  const { productId } = req.params;
-
-  if (!mongoose.Types.ObjectId.isValid(productId))
-    throw new AppError(httpStatus.BAD_REQUEST, "Invalid ID");
-
-  await Product.findByIdAndDelete(productId);
+  if (!product) throw new AppError(httpStatus.NOT_FOUND, "Product not found");
+  if (
+    req.user.role === "manager" &&
+    product.vendor.toString() !== req.user._id.toString()
+  ) {
+    throw new AppError(
+      httpStatus.FORBIDDEN,
+      "Cannot delete other vendor's product"
+    );
+  }
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: "Deleted",
+    message: "Product deleted",
+    data: product,
+  });
+});
+
+// Admin-specific: Verify product
+export const verifyProduct = catchAsync(async (req, res) => {
+  const product = await Product.findByIdAndUpdate(
+    req.params.id,
+    { verified: true },
+    { new: true }
+  );
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Product verified",
+    data: product,
   });
 });

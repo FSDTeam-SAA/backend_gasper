@@ -1,15 +1,10 @@
-import mongoose from "mongoose";
-import crypto from "crypto";
+import mongoose, { Schema } from "mongoose";
 
-const orderItemSchema = new mongoose.Schema({
+const orderItemSchema = new Schema({
   product: {
-    type: mongoose.Schema.Types.ObjectId,
+    type: Schema.Types.ObjectId,
     ref: "Product",
     required: true,
-  },
-  variant: {
-    type: mongoose.Schema.Types.Mixed,
-    default: {},
   },
   quantity: {
     type: Number,
@@ -20,86 +15,62 @@ const orderItemSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
-  specialRequest: {
-    type: String,
-    trim: true,
-  },
-  totalPrice: {
-    type: Number,
-    required: true,
-  },
 });
 
-const orderSchema = new mongoose.Schema(
+const orderSchema = new Schema(
   {
-    code: {
+    orderId: {
       type: String,
+      required: true,
       unique: true,
-      default: () => crypto.randomInt(100000, 999999).toString(),
+    },
+    items: [orderItemSchema],
+    totalAmount: {
+      type: Number,
+      required: true,
+    },
+    shippingFee: {
+      type: Number,
+      default: 5,
+    },
+    discount: {
+      type: Number,
+      default: 0,
+    },
+    status: {
+      type: String,
+      enum: ["pending", "in_progress", "shipped", "delivered", "cancelled"],
+      default: "pending",
+    },
+    trackingNumber: {
+      type: String,
+      default: "",
+    },
+    expectedDeliveryDate: {
+      type: Date,
     },
     customer: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    vendor: {
+      type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
     address: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User.addresses",
-      required: true,
+      street: { type: String, required: true },
+      city: { type: String, required: true },
+      postalCode: { type: String, required: true },
+      country: { type: String, required: true },
     },
-    deliveryInstructions: {
-      type: String,
-      trim: true,
-    },
-    deliveryTime: {
-      type: Date,
-      required: true,
-    },
-    products: [orderItemSchema],
-    subtotal: {
-      type: Number,
-      required: true,
-    },
-    deliveryFee: {
-      type: Number,
-      required: true,
-      default: 0,
-    },
-    totalPrice: {
-      type: Number,
-      required: true,
-    },
-    status: {
-      type: String,
-      enum: ["placed", "packaging", "on_way", "delivered", "cancelled"],
-      default: "placed",
-    },
-    paymentStatus: {
-      type: String,
-      enum: ["paid", "unpaid", "refunded"],
-      default: "unpaid",
-    },
-    paymentMethod: {
-      type: String,
-      enum: ["cash_on_delivery", "card", "apple_pay", "visa"],
-      required: true,
-    },
-    transactionId: {
-      type: String,
-    },
-    tracking: {
-      type: String,
-    },
-    date: {
-      type: Date,
-      default: Date.now,
+    coupon: {
+      type: Schema.Types.ObjectId,
+      ref: "Coupon",
     },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
-
-orderSchema.index({ status: 1, date: -1, code: 1 });
 
 export const Order = mongoose.model("Order", orderSchema);

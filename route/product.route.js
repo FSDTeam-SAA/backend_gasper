@@ -1,25 +1,32 @@
 import express from "express";
-
 import {
-  createProduct,
-  deleteProduct,
-  getCategoryProducts,
-  getProductById,
+  addProduct,
   getProducts,
+  getProductById,
   updateProduct,
+  deleteProduct,
+  verifyProduct,
 } from "../controller/product.controller.js";
-
 import { protect } from "../middleware/auth.middleware.js";
 import upload from "../middleware/multer.middleware.js";
-
 const router = express.Router();
-router.use(protect);
 
-router.get("/", getProducts);
-router.get("/category/:categoryId", getCategoryProducts);
-router.get("/:productId", getProductById);
-router.post("/", upload.array("images", 6), createProduct);
-router.put("/:productId", upload.array("images", 6), updateProduct);
-router.delete("/:productId", deleteProduct);
+router.post(
+  "/add",
+  protect,
+  upload.fields([{ name: "photos", maxCount: 10 }]),
+  addProduct
+);
+
+router.get("/", protect, getProducts);
+router.get("/:id", protect, getProductById);
+router.put(
+  "/:id",
+  protect,
+  upload.fields([{ name: "photos", maxCount: 10 }]),
+  updateProduct
+);
+router.delete("/:id", protect, deleteProduct);
+router.patch("/:id/verify", protect, verifyProduct);
 
 export default router;

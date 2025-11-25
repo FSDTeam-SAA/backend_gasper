@@ -1,107 +1,97 @@
-import mongoose from "mongoose";
+import mongoose, { Schema } from "mongoose";
 
-const optionSchema = new mongoose.Schema({
-  title: {
-    type: String,
-    required: true,
-    trim: true,
-  },
-  price: {
-    type: Number,
-    required: true,
-    min: [0, "Price cannot be negative"],
-  },
-  quantityType: {
-    type: String,
-    enum: ["pieces", "kg"],
-    required: true,
-  },
-  stock: {
-    type: Number,
-    min: [0, "Stock cannot be negative"],
-    default: 0,
-  },
-});
-
-const productSchema = new mongoose.Schema(
+const productSchema = new Schema(
   {
-    name: {
+    title: {
       type: String,
-      required: [true, "Product name is required"],
+      required: [true, "Product title is required"],
       trim: true,
     },
     description: {
       type: String,
       required: [true, "Product description is required"],
-      trim: true,
     },
-    basePrice: {
+    detailedDescription: {
+      type: String,
+      default: "",
+    },
+    price: {
       type: Number,
       required: [true, "Product price is required"],
       min: [0, "Price cannot be negative"],
     },
+    colors: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
+    photos: [
+      {
+        public_id: { type: String },
+        url: { type: String },
+      },
+    ],
     category: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "ProductCategory",
-      required: [true, "Category is required"],
+      type: Schema.Types.ObjectId,
+      ref: "Category",
+      required: true,
     },
-    options: [optionSchema],
-    discountPercent: {
-      type: Number,
-      min: [0, "Discount cannot be negative"],
-      max: [100, "Discount cannot exceed 100"],
-      default: 0,
+    vendor: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
     },
     stock: {
       type: Number,
-      min: [0, "Stock cannot be negative"],
       default: 0,
+      min: [0, "Stock cannot be negative"],
     },
-    images: {
-      type: [String],
-      default: [],
-      required: [true, "At least one image is required"],
-    },
-    variation: {
+    sku: {
       type: String,
+      required: [true, "SKU is required"],
+      unique: true,
       trim: true,
     },
-    review: [
-      {
-        rating: {
-          type: Number,
-          min: [1, "Rating must be at least 1"],
-          max: [5, "Rating cannot exceed 5"],
-          required: true,
-        },
-        user: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "User",
-        },
-        text: {
-          type: String,
-          trim: true,
-        },
-      },
-    ],
+    status: {
+      type: String,
+      enum: ["in_stock", "out_of_stock", "low_stock"],
+      default: "in_stock",
+    },
+    verified: {
+      type: Boolean,
+      default: false,
+    },
+    soldCount: {
+      type: Number,
+      default: 0,
+    },
+    rating: {
+      type: Number,
+      default: 0,
+      min: [0, "Rating cannot be negative"],
+      max: [5, "Rating cannot exceed 5"],
+    },
     reviewsCount: {
       type: Number,
       default: 0,
-      min: [0, "Reviews count cannot be negative"],
     },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
-productSchema.virtual("averageRating").get(function () {
-  const sum = this.review?.reduce((acc, r) => acc + r.rating, 0);
-  return this.reviewsCount > 0
-    ? Math.round((sum / this.reviewsCount) * 10) / 10
-    : 0;
+// Update stock status on stock change
+productSchema.pre("save", function (next) {
+  if (this.isModified("stock")) {
+    if (this.stock === 0) {
+      this.status = "out_of_stock";
+    } else if (this.stock < 5) {
+      this.status = "low_stock";
+    } else {
+      this.status = "in_stock";
+    }
+  }
+  next();
 });
-
-productSchema.set("toJSON", { virtuals: true });
 
 export const Product = mongoose.model("Product", productSchema);

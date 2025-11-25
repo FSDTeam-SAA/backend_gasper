@@ -1,218 +1,150 @@
-import { Order } from "../model/order.model.js";
-import { Cart } from "../model/cart.model.js";
-import { User } from "../model/user.model.js";
-import AppError from "../errors/AppError.js";
-import catchAsync from "../utils/catchAsync.js";
 import httpStatus from "http-status";
+import { Order as OrderModel } from "../model/order.model.js";
+import AppError from "../errors/AppError.js";
 import sendResponse from "../utils/sendResponse.js";
+import catchAsync from "../utils/catchAsync.js";
+import { nanoid } from "nanoid";
+import { Product } from "../model/product.model.js";
 
-export const checkoutCart = catchAsync(async (req, res) => {
-  const {
-    addressIndex = 0,
-    deliveryTime,
-    paymentMethod,
-    instructions = "",
-  } = req.body;
+export const createOrder = catchAsync(async (req, res) => {
+  const { items, address, coupon } = req.body;
+  const customer = req.user._id;
 
-  const user = await User.findById(req.user._id);
+  let totalAmount = 0;
+  const orderItems = [];
+  for (let item of items) {
+    const product = await Product.findById(item.product);
+    if (!product || product.stock < item.quantity) {
+      throw new AppError(
+        httpStatus.BAD_REQUEST,
+        `Insufficient stock for ${product?.title}`
+      );
+    }
+    totalAmount += product.price * item.quantity;
+    orderItems.push({
+      product: item.product,
+      quantity: item.quantity,
+      price: product.price,
+      vendor: product.vendor,
+    });
 
-  const address = user.addresses[addressIndex];
-
-  if (!address || !deliveryTime || !paymentMethod) {
-    throw new AppError(
-      httpStatus.BAD_REQUEST,
-      "Address, delivery time, payment method required"
-    );
+    // Update stock
+    product.stock -= item.quantity;
+    await product.save();
   }
 
-  const cart = await Cart.findOne({ customer: req.user._id }).populate(
-    "items.product"
-  );
+  let discount = 0;
+  if (coupon) {
+    // Validate coupon logic here
+    discount = totalAmount * 0.2;
+    totalAmount -= discount;
+  }
 
-  if (!cart || cart.items.length === 0)
-    throw new AppError(httpStatus.BAD_REQUEST, "Cart empty");
+  const orderId = `ORD${nanoid(6)}`;
 
-  const products = cart.items.map((item) => ({
-    product: item.product._id,
-    variant: item.variant,
-    quantity: item.quantity,
-    price: item.price,
-    specialRequest: item.specialRequest,
-    totalPrice: item.price * item.quantity,
-  }));
-
-  const order = new Order({
-    customer: req.user._id,
-    address: address._id, // Virtual ref
-    deliveryInstructions: instructions,
-    deliveryTime: new Date(deliveryTime),
-    products,
-    subtotal: cart.subtotal,
-    deliveryFee: cart.deliveryFee,
-    totalPrice: cart.total,
-    paymentMethod,
+  const order = await OrderModel.create({
+    orderId,
+    items: orderItems,
+    totalAmount,
+    discount,
+    customer,
+    vendor: orderItems[0].vendor,
+    address,
+    coupon,
+    expectedDeliveryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
   });
-
-  await order.save();
-
-  // Clear cart
-  await Cart.findOneAndUpdate(
-    { customer: req.user._id },
-    { items: [], subtotal: 0, deliveryFee: 0, total: 0 }
-  );
-
-  const populated = await Order.findById(order._id).populate(
-    "products.product"
-  );
-
-  populated.address = address;
 
   sendResponse(res, {
     statusCode: httpStatus.CREATED,
-    message: "Order placed",
     success: true,
-    data: populated,
+    message: "Order created",
+    data: order,
   });
 });
 
-export const getMyOrders = catchAsync(async (req, res) => {
+export const getOrders = catchAsync(async (req, res) => {
   const { status, page = 1, limit = 10 } = req.query;
+  const query = { customer: req.user._id };
+  if (status) query.status = status;
 
-  const filter = { customer: req.user._id };
+  if (req.user.role === "manager") {
+    query.vendor = req.user._id;
+    delete query.customer;
+  } else if (req.user.role === "admin") {
+    delete query.customer;
+  }
 
-  if (status) filter.status = status;
-
-  const orders = await Order.find(filter)
-    .populate("products.product", "name basePrice images")
-    .sort({ createdAt: -1 })
+  const orders = await OrderModel.find(query)
+    .populate("items.product", "title price photos")
+    .populate("customer", "name email")
+    .populate("vendor", "name storeName")
+    .limit(limit * 1)
     .skip((page - 1) * limit)
-    .limit(Number(limit));
-
-  const user = await User.findById(req.user._id);
-
-  orders.forEach((order) => {
-    order.address = user.addresses.id(order.address); // Manual
-  });
-
-  const total = await Order.countDocuments(filter);
+    .sort({ createdAt: -1 });
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
-    message: "Orders fetched",
     success: true,
-    data: {
-      orders,
-      pagination: { page: Number(page), limit: Number(limit), total },
-    },
+    message: "Orders fetched",
+    data: orders,
   });
 });
 
-export const getAllOrders = catchAsync(async (req, res) => {
-  if (!req.user._id)
-    throw new AppError(httpStatus.FORBIDDEN, "You need to pass the token");
+export const getOrderById = catchAsync(async (req, res) => {
+  const order = await OrderModel.findOne({ orderId: req.params.orderId })
+    .populate("items.product", "title price photos")
+    .populate("customer", "name email")
+    .populate("vendor", "name storeName");
 
-  const { status, phone, page = 1, limit = 10 } = req.query;
+  console.log(order);
+  console.log(req.user._id);
+  if (!order) throw new AppError(httpStatus.NOT_FOUND, "Order not found");
 
-  const filter = {};
-  if (status) filter.status = status;
-  if (phone) filter["customer.phone"] = { $regex: phone, $options: "i" };
-
-  const orders = await Order.find(filter)
-    .populate("customer", "firstName lastName phone")
-    .populate("products.product", "name")
-    .sort({ createdAt: -1 })
-    .skip((page - 1) * limit)
-    .limit(Number(limit));
-
-  orders.forEach((order) => {
-    order.address = order.customer.addresses[0];
-  });
-
-  const total = await Order.countDocuments(filter);
+  // Role check for access
+  if (
+    req.user.role === "user" &&
+    order.customer._id.toString() !== req.user._id.toString()
+  ) {
+    throw new AppError(httpStatus.FORBIDDEN, "Access denied");
+  }
+  if (
+    req.user.role === "manager" &&
+    order.vendor.toString() !== req.user._id.toString()
+  ) {
+    throw new AppError(httpStatus.FORBIDDEN, "Access denied");
+  }
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
-    message: "All orders",
     success: true,
-    data: {
-      orders,
-      pagination: { page: Number(page), limit: Number(limit), total },
-    },
+    message: "Order fetched",
+    data: order,
   });
 });
 
 export const updateOrderStatus = catchAsync(async (req, res) => {
-  if (!req.user._id)
-    throw new AppError(httpStatus.FORBIDDEN, "You need to pass the token");
+  if (req.user.role !== "manager" && req.user.role !== "admin") {
+    throw new AppError(
+      httpStatus.FORBIDDEN,
+      "Only managers/admins can update status"
+    );
+  }
 
-  const { orderId } = req.params;
+  const { status, trackingNumber } = req.body;
+  const order = await OrderModel.findOneAndUpdate(
+    { orderId: req.params.orderId },
+    { status, trackingNumber },
+    { new: true }
+  ).populate("items.product");
 
-  const { status, tracking } = req.body;
-
-  const order = await Order.findById(orderId);
-
-  if (!order) throw new AppError(httpStatus.NOT_FOUND, "Order not found");
-
-  order.status = status;
-
-  if (tracking) order.tracking = tracking;
-
-  await order.save();
-
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    message: "Status updated",
-    success: true,
-    data: order,
-  });
-});
-
-export const getOrderDetails = catchAsync(async (req, res) => {
-  const { orderId } = req.params;
-
-  const order = await Order.findById(orderId).populate(
-    "products.product customer"
-  );
-
-  if (!order) throw new AppError(httpStatus.NOT_FOUND, "Order not found");
-
-  if (!order.customer.equals(req.user._id) && req.user.role !== "admin") {
+  if (!order || order.vendor.toString() !== req.user._id.toString()) {
     throw new AppError(httpStatus.FORBIDDEN, "Access denied");
   }
 
-  const user = await User.findById(order.customer._id);
-
-  order.address = user.addresses.id(order.address);
-
   sendResponse(res, {
     statusCode: httpStatus.OK,
-    message: "Order details",
     success: true,
-    data: order,
-  });
-});
-
-export const cancelOrder = catchAsync(async (req, res) => {
-  const { orderId } = req.params;
-
-  const order = await Order.findById(orderId);
-
-  if (!order || !order.customer.equals(req.user._id))
-    throw new AppError(httpStatus.FORBIDDEN, "Not your order");
-
-  if (["on_way", "delivered"].includes(order.status))
-    throw new AppError(httpStatus.BAD_REQUEST, "Cannot cancel");
-
-  order.status = "cancelled";
-
-  if (order.paymentStatus === "paid") order.paymentStatus = "refunded";
-
-  await order.save();
-
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    message: "Cancelled",
-    success: true,
+    message: "Order status updated",
     data: order,
   });
 });

@@ -2,6 +2,7 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
 import { v2 as cloudinary } from "cloudinary";
+import nodemailer from "nodemailer";
 
 // Generate a random OTP
 export const generateOTP = () => {
@@ -33,6 +34,14 @@ export const hashPassword = async (newPassword) => {
 export const uniqueTransactionId = () => {
   return uuidv4().replace(/-/g, "").substr(0, 12).toUpperCase();
 };
+
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
 
 export const sendOTP = async (email, code) => {
   const mailOptions = {
