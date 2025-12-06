@@ -189,6 +189,35 @@ export const getProducts = catchAsync(async (req, res) => {
   if (inStock === "true") query.stock = { $gt: 0 };
   if (inStock === "false") query.stock = 0;
 
+  const ensureInStock = () => {
+    if (inStock !== "false") {
+      if (!query.stock) query.stock = { $gt: 0 };
+      if (typeof query.stock === "number") {
+      } else if (
+        query.stock &&
+        query.stock.$gt === undefined &&
+        query.stock.$gte === undefined
+      ) {
+        query.stock.$gt = 0;
+      }
+    }
+  };
+
+  if (type === "featured") {
+    query.verified = true;
+    ensureInStock();
+
+    query.rating = { $gte: 4 };
+    query.reviewsCount = { $gte: 1 };
+  }
+
+  if (type === "popular") {
+    query.verified = true;
+    ensureInStock();
+
+    query.$or = [{ soldCount: { $gt: 0 } }, { reviewsCount: { $gte: 1 } }];
+  }
+
   let sortObj = { createdAt: -1 };
 
   if (type === "popular") {

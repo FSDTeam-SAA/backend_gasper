@@ -37,6 +37,10 @@ const couponSchema = new Schema(
       enum: ["active", "inactive"],
       default: "active",
     },
+    couponImage: {
+      public_id: { type: String, default: "" },
+      url: { type: String, default: "" },
+    },
     usageLimit: {
       type: Number,
       default: 0,

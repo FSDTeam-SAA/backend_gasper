@@ -7,6 +7,12 @@ import catchAsync from "../utils/catchAsync.js";
 export const createCoupon = catchAsync(async (req, res) => {
   const coupon = await Coupon.create(req.body);
 
+  if (req.file) {
+    const upload = await uploadOnCloudinary(req.file.buffer);
+    coupon.image = { public_id: upload.public_id, url: upload.secure_url };
+    await coupon.save();
+  }
+
   sendResponse(res, {
     statusCode: httpStatus.CREATED,
     success: true,
