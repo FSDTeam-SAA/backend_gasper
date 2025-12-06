@@ -148,24 +148,70 @@ export const updateProduct = catchAsync(async (req, res) => {
 });
 
 export const getProducts = catchAsync(async (req, res) => {
-  const { page = 1, limit = 10, category, search, vendor } = req.query;
+  const {
+    page = 1,
+    limit = 10,
+    category,
+    search,
+    vendor,
+    type, // "popular" | "featured"
+    minPrice,
+    maxPrice,
+    inStock, // "true" | "false"
+    sort, // optional override
+  } = req.query;
+
   const query = {};
+
   if (category) query.category = category;
   if (search) query.title = { $regex: search, $options: "i" };
-  if (req.user.role === "manager" && vendor !== req.user._id.toString()) {
-    throw new AppError(
-      httpStatus.FORBIDDEN,
-      "Cannot access other vendor products"
-    );
-  }
   if (vendor) query.vendor = vendor;
+
+  if (req.user.role === "manager") {
+    const myVendorId = req.user._id.toString();
+    if (vendor && vendor !== myVendorId) {
+      throw new AppError(
+        httpStatus.FORBIDDEN,
+        "Cannot access other vendor products"
+      );
+    }
+    query.vendor = myVendorId;
+  }
+
+  // price filtering
+  if (minPrice || maxPrice) {
+    query.price = {};
+    if (minPrice) query.price.$gte = Number(minPrice);
+    if (maxPrice) query.price.$lte = Number(maxPrice);
+  }
+
+  // stock filtering
+  if (inStock === "true") query.stock = { $gt: 0 };
+  if (inStock === "false") query.stock = 0;
+
+  let sortObj = { createdAt: -1 };
+
+  if (type === "popular") {
+    sortObj = { soldCount: -1, rating: -1, reviewsCount: -1, createdAt: -1 };
+  }
+
+  if (type === "featured") {
+    sortObj = { rating: -1, reviewsCount: -1, createdAt: -1 };
+  }
+
+  if (sort === "price_asc") sortObj = { price: 1 };
+  if (sort === "price_desc") sortObj = { price: -1 };
+  if (sort === "latest") sortObj = { createdAt: -1 };
+
+  const pageNum = Number(page);
+  const limitNum = Number(limit);
 
   const products = await Product.find(query)
     .populate("category", "name")
-    .populate("vendor", "name storeName") // Assuming manager has storeName field, add if needed
-    .limit(limit * 1)
-    .skip((page - 1) * limit)
-    .sort({ createdAt: -1 });
+    .populate("vendor", "name storeName")
+    .limit(limitNum)
+    .skip((pageNum - 1) * limitNum)
+    .sort(sortObj);
 
   const total = await Product.countDocuments(query);
 
@@ -173,7 +219,7 @@ export const getProducts = catchAsync(async (req, res) => {
     statusCode: httpStatus.OK,
     success: true,
     message: "Products fetched",
-    data: { products, pagination: { total, page, limit } },
+    data: { products, pagination: { total, page: pageNum, limit: limitNum } },
   });
 });
 

@@ -85,8 +85,17 @@ const userSchema = new Schema(
     password_reset_token: { type: String, default: "" },
     refreshToken: { type: String, default: "" },
     isEmailVerified: { type: Boolean, default: false },
-    resetPasswordOTP: { type: String },
-    resetPasswordOTPExpiry: { type: Date },
+    otp: {
+      hash: { type: String, default: "" },
+      expiresAt: { type: Date, default: null },
+      purpose: {
+        type: String,
+        enum: ["verify_email", "reset_password"],
+        default: null,
+      },
+      attempts: { type: Number, default: 0 },
+      lastSentAt: { type: Date, default: null },
+    },
     review: [
       {
         rating: {

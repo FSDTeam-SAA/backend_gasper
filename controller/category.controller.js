@@ -67,8 +67,13 @@ export const getCategories = catchAsync(async (req, res) => {
         const productCount = await Product.countDocuments({
           category: category._id,
         });
+
+        const associatedProducts = await Product.find({
+          category: category._id,
+        });
         return {
           ...category.toObject(),
+          associatedProducts,
           productCount,
         };
       })
@@ -192,6 +197,9 @@ export const getCategoryTree = catchAsync(async (req, res) => {
         const productCount = await Product.countDocuments({
           category: category._id,
         });
+        const associatedProducts = await Product.find({
+          category: category._id,
+        });
 
         return {
           _id: category._id,
@@ -199,6 +207,7 @@ export const getCategoryTree = catchAsync(async (req, res) => {
           image: category.image,
           level: category.level,
           path: category.path,
+          associatedProducts,
           productCount,
           children: children.length > 0 ? children : undefined,
         };

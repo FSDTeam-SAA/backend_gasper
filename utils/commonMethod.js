@@ -5,13 +5,19 @@ import { v2 as cloudinary } from "cloudinary";
 import nodemailer from "nodemailer";
 
 // Generate a random OTP
-export const generateOTP = () => {
-  const OTP_LENGTH = 6;
-  const otp = Array.from({ length: OTP_LENGTH }, () =>
-    crypto.randomInt(0, 9)
-  ).join("");
-  return otp;
+export const generateOTP = (length = 6) => {
+  // numeric OTP
+  const min = 10 ** (length - 1);
+  const max = 10 ** length - 1;
+  return String(Math.floor(min + Math.random() * (max - min + 1)));
 };
+
+export const hashOTP = (otp) => {
+  return crypto.createHash("sha256").update(String(otp)).digest("hex");
+};
+
+export const isOtpExpired = (expiresAt) =>
+  !expiresAt || expiresAt.getTime() < Date.now();
 
 //Generate unique ID
 export const generateUniqueId = () => {
