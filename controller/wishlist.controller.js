@@ -5,6 +5,7 @@ import catchAsync from "../utils/catchAsync.js";
 
 export const addToWishlist = catchAsync(async (req, res) => {
   const { product } = req.body;
+  console.log(req.user)
   const user = req.user._id;
 
   let wishlist = await Wishlist.findOne({ user });

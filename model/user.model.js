@@ -132,7 +132,7 @@ userSchema.statics.isUserExistsByEmail = async function (email) {
 
 userSchema.statics.isOTPVerified = async function (id) {
   const user = await this.findById(id).select("+verificationInfo");
-  return user?.verificationInfo.verified;
+  return user?.isEmailVerified;
 };
 
 userSchema.statics.isPasswordMatched = async function (
