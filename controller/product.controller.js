@@ -153,7 +153,7 @@ export const getProducts = catchAsync(async (req, res) => {
     limit = 10,
     category,
     search,
-    vendor,
+    user,
     type, // "popular" | "featured"
     minPrice,
     maxPrice,
@@ -165,18 +165,6 @@ export const getProducts = catchAsync(async (req, res) => {
 
   if (category) query.category = category;
   if (search) query.title = { $regex: search, $options: "i" };
-  if (vendor) query.vendor = vendor;
-
-  if (req.user.role === "manager") {
-    const myVendorId = req.user._id.toString();
-    if (vendor && vendor !== myVendorId) {
-      throw new AppError(
-        httpStatus.FORBIDDEN,
-        "Cannot access other vendor products"
-      );
-    }
-    query.vendor = myVendorId;
-  }
 
   // price filtering
   if (minPrice || maxPrice) {
