@@ -2,7 +2,9 @@ import express from "express";
 import {
   addProduct,
   getProducts,
+  getProductsByBrand,
   getProductById,
+  newArrivals,
   updateProduct,
   deleteProduct,
   verifyProduct,
@@ -19,6 +21,8 @@ router.post(
 );
 
 router.get("/", protect, getProducts);
+router.get("/brand/:brandName", protect, getProductsByBrand);
+router.get("/new-arrivals", protect, newArrivals);
 router.get("/:id", protect, getProductById);
 router.put(
   "/:id",

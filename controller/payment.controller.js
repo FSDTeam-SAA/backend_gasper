@@ -1,101 +1,132 @@
 import { Order } from "../model/order.model.js";
 import { paymentInfo } from "../model/payment.model.js";
-import { User } from "../model/user.model.js";
 import Stripe from "stripe";
+import httpStatus from "http-status";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: "2022-11-15",
 });
 
 export const createPayment = async (req, res) => {
-  const { userId, price, orderId } = req.body;
+  const userId = req.user._id;
+  const { orderId } = req.body;
 
-  if (!price) {
-    return res.status(400).json({ error: "amount is required." });
+  if (!orderId) {
+    return res.status(httpStatus.BAD_REQUEST).json({
+      success: false,
+      message: "Order ID is required",
+    });
   }
 
-  try {
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(price * 100),
-      currency: "usd",
-      automatic_payment_methods: { enabled: true },
-      metadata: { userId, orderId },
-    });
+  const order = await Order.findById(orderId);
 
-    await paymentInfo.create({
-      userId,
-      orderId,
-      price,
-      transactionId: paymentIntent.id,
-      paymentStatus: "pending",
+  if (!order) {
+    return res.status(httpStatus.NOT_FOUND).json({
+      success: false,
+      message: "Order not found",
     });
+  }
 
-    res.status(200).json({
-      success: true,
+  if (order.paymentStatus === "paid") {
+    return res.status(httpStatus.BAD_REQUEST).json({
+      success: false,
+      message: "Order already paid",
+    });
+  }
+
+  const amount = Math.round(order.totalAmount * 100);
+
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount,
+    currency: "usd",
+    automatic_payment_methods: { enabled: true },
+    metadata: {
+      userId: userId.toString(),
+      orderId: order._id.toString(),
+    },
+  });
+
+  await paymentInfo.create({
+    userId,
+    orderId: order._id,
+    price: order.totalAmount,
+    transactionId: paymentIntent.id,
+    paymentStatus: "pending",
+  });
+
+  return res.status(httpStatus.OK).json({
+    success: true,
+    message: "PaymentIntent created",
+    data: {
       clientSecret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id,
-      message: "PaymentIntent created.",
-    });
-  } catch (error) {
-    res.status(500).json({ error: "Internal server error." });
-  }
+    },
+  });
 };
 
 export const confirmPayment = async (req, res) => {
   const { paymentIntentId } = req.body;
 
   if (!paymentIntentId) {
-    return res.status(400).json({ error: "Missing paymentIntentId" });
+    return res.status(400).json({
+      success: false,
+      message: "PaymentIntent ID is required",
+    });
   }
 
-  try {
-    // Retrieve payment intent from Stripe
-    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+  const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
 
-    if (!paymentIntent) {
-      return res.status(404).json({ error: "PaymentIntent not found" });
-    }
+  if (!paymentIntent) {
+    return res.status(404).json({
+      success: false,
+      message: "PaymentIntent not found",
+    });
+  }
 
-    // Check final status
-    if (paymentIntent.status !== "succeeded") {
-      await paymentInfo.findOneAndUpdate(
-        { transactionId: paymentIntentId },
-        { paymentStatus: "failed" }
-      );
+  const paymentRecord = await paymentInfo.findOne({
+    transactionId: paymentIntentId,
+  });
 
-      return res.status(400).json({
-        error: "Payment did not succeed",
-        status: paymentIntent.status,
-      });
-    }
+  if (!paymentRecord) {
+    return res.status(404).json({
+      success: false,
+      message: "Payment record not found",
+    });
+  }
 
-    // Update database
-    const paymentRecord = await paymentInfo.findOneAndUpdate(
-      { transactionId: paymentIntentId },
-      { paymentStatus: "complete" },
-      { new: true }
-    );
+  if (paymentIntent.status === "succeeded") {
+    await paymentInfo.findByIdAndUpdate(paymentRecord._id, {
+      paymentStatus: "complete",
+    });
 
-    if (paymentRecord?.orderId) {
-      const order = await Order.findById(paymentRecord.orderId).populate(
-        "product user seller"
-      );
-
-      await Order.findByIdAndUpdate(paymentRecord.orderId, {
-        paymentStatus: "paid",
-      });
-    }
+    await Order.findByIdAndUpdate(paymentRecord.orderId, {
+      paymentStatus: "paid",
+    });
 
     return res.status(200).json({
       success: true,
-      message: "Payment confirmed",
-      paymentIntentId,
-    });
-  } catch (error) {
-    console.log(error);
-    return res.status(500).json({
-      error: "Internal server error",
-      stripeError: error?.message,
+      message: "Payment successful",
     });
   }
+
+  if (
+    paymentIntent.status === "processing" ||
+    paymentIntent.status === "requires_action"
+  ) {
+    return res.status(200).json({
+      success: true,
+      message: "Payment processing",
+      data: { status: paymentIntent.status },
+    });
+  }
+
+  await paymentInfo.findByIdAndUpdate(paymentRecord._id, {
+    paymentStatus: "failed",
+  });
+
+  return res.status(400).json({
+    success: false,
+    message: "Payment failed",
+    data: { status: paymentIntent.status },
+  });
 };

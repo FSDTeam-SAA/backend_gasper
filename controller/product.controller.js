@@ -10,6 +10,8 @@ import { User } from "../model/user.model.js";
 export const addProduct = catchAsync(async (req, res) => {
   const {
     title,
+    brand,
+    size,
     description,
     detailedDescription,
     price,
@@ -54,6 +56,8 @@ export const addProduct = catchAsync(async (req, res) => {
 
   const product = await Product.create({
     title,
+    brand,
+    size,
     description,
     detailedDescription,
     price: parseFloat(price),
@@ -237,6 +241,52 @@ export const getProducts = catchAsync(async (req, res) => {
     success: true,
     message: "Products fetched",
     data: { products, pagination: { total, page: pageNum, limit: limitNum } },
+  });
+});
+
+export const getProductsByBrand = catchAsync(async (req, res) => {
+  const { brandName } = req.params;
+
+  if (!brandName) {
+    throw new AppError(httpStatus.BAD_REQUEST, "Brand name is required");
+  }
+
+  const products = await Product.find({
+    brand: { $regex: new RegExp(`^${brandName}$`, "i") },
+  })
+    .populate("category", "name")
+    .populate("vendor", "name email")
+    .sort({ createdAt: -1 });
+
+  if (!products.length) {
+    throw new AppError(
+      httpStatus.NOT_FOUND,
+      "No products found for this brand"
+    );
+  }
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Products fetched successfully",
+    data: products,
+  });
+});
+
+export const newArrivals = catchAsync(async (req, res) => {
+  const { limit = 10 } = req.query;
+
+  const products = await Product.find()
+    .populate("category", "name")
+    .populate("vendor", "name storeName")
+    .limit(Number(limit))
+    .sort({ createdAt: -1 });
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Products fetched",
+    data: products,
   });
 });
 

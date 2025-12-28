@@ -7,6 +7,14 @@ const productSchema = new Schema(
       required: [true, "Product title is required"],
       trim: true,
     },
+    brand: {
+      type: String,
+      trim: true,
+    },
+    size: {
+      type: String,
+      enum: ["XS", "S", "M", "L", "XL", "XXL"],
+    },
     description: {
       type: String,
       required: [true, "Product description is required"],
