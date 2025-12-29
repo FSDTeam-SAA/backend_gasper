@@ -398,6 +398,11 @@ export const changePassword = catchAsync(async (req, res) => {
   if (!user) {
     throw new AppError(httpStatus.NOT_FOUND, "User not found");
   }
+
+      if (!(await User.isPasswordMatched(oldPassword, user.password))) {
+    return next(new AppError(403, "Old Password is not correct"));
+  }
+
   user.password = newPassword;
   await user.save();
   sendResponse(res, {
