@@ -3,6 +3,7 @@ import {
   addProduct,
   getProducts,
   getProductsByBrand,
+  getAllBrands,
   getProductById,
   newArrivals,
   updateProduct,
@@ -22,6 +23,7 @@ router.post(
 
 router.get("/", protect, getProducts);
 router.get("/brand/:brandName", protect, getProductsByBrand);
+router.get("/brands", protect, getAllBrands);
 router.get("/new-arrivals", protect, newArrivals);
 router.get("/:id", protect, getProductById);
 router.put(

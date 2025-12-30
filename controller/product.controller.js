@@ -244,6 +244,79 @@ export const getProducts = catchAsync(async (req, res) => {
   });
 });
 
+export const getAllBrands = catchAsync(async (req, res) => {
+  const { page = 1, limit = 20, sort = "asc" } = req.query;
+
+  const pageNum = Number(page);
+  const limitNum = Number(limit);
+  const sortOrder = sort === "asc" ? 1 : -1;
+
+  const pipeline = [
+    {
+      $match: {
+        brand: { $nin: [null, ""] },
+      },
+    },
+
+    {
+      $group: {
+        _id: "$brand",
+      },
+    },
+
+    {
+      $sort: { _id: sortOrder },
+    },
+
+    {
+      $skip: (pageNum - 1) * limitNum,
+    },
+    {
+      $limit: limitNum,
+    },
+  ];
+
+  // Fetch paginated brands
+  const brandsResult = await Product.aggregate(pipeline);
+
+  // Count total unique brands
+  const totalBrands = await Product.aggregate([
+    {
+      $match: {
+        brand: { $nin: [null, ""] },
+      },
+    },
+    {
+      $group: {
+        _id: "$brand",
+      },
+    },
+    {
+      $count: "total",
+    },
+  ]);
+
+  const total = totalBrands[0]?.total || 0;
+
+  // Extract brand names
+  const brands = brandsResult.map((item) => item._id);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Brands fetched successfully",
+    data: {
+      brands,
+      pagination: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum),
+      },
+    },
+  });
+});
+
 export const getProductsByBrand = catchAsync(async (req, res) => {
   const { brandName } = req.params;
 
