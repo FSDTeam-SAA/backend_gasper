@@ -347,19 +347,35 @@ export const getProductsByBrand = catchAsync(async (req, res) => {
 });
 
 export const newArrivals = catchAsync(async (req, res) => {
-  const { limit = 10 } = req.query;
+  const { page = 1, limit = 20, sort = "asc" } = req.query;
 
-  const products = await Product.find()
-    .populate("category", "name")
-    .populate("vendor", "name storeName")
-    .limit(Number(limit))
-    .sort({ createdAt: -1 });
+  const pageNum = Math.max(Number(page) || 1, 1);
+  const limitNum = Math.max(Number(limit) || 20, 1);
+  const sortOrder = sort === "asc" ? 1 : -1;
+
+  const [products, total] = await Promise.all([
+    Product.find()
+      .populate("category", "name")
+      .populate("vendor", "name storeName")
+      .sort({ createdAt: sortOrder })
+      .limit(limitNum)
+      .skip((pageNum - 1) * limitNum),
+    Product.countDocuments(),
+  ]);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
     message: "Products fetched",
-    data: products,
+    data: {
+      products,
+      pagination: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum),
+      },
+    },
   });
 });
 
