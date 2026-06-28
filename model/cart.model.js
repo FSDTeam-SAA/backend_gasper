@@ -1,23 +1,32 @@
-import mongoose, { Schema } from "mongoose";
+import mongoose, { Schema } from 'mongoose';
 
 const cartItemSchema = new Schema({
-  product: {
-    type: Schema.Types.ObjectId,
-    ref: "Product",
+  shopifyProductId: {
+    type: String,
+    required: true,
+  },
+  variantId: {
+    type: String,
     required: true,
   },
   quantity: {
     type: Number,
     required: true,
-    min: [1, "Quantity must be at least 1"],
+    min: [1, 'Quantity must be at least 1'],
   },
+  price: {
+    type: Number,
+    required: true,
+  },
+  title: { type: String, default: '' },
+  image: { type: String, default: '' },
 });
 
 const cartSchema = new Schema(
   {
     user: {
       type: Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
       unique: true,
     },
@@ -30,4 +39,4 @@ const cartSchema = new Schema(
   { timestamps: true }
 );
 
-export const Cart = mongoose.model("Cart", cartSchema);
+export const Cart = mongoose.model('Cart', cartSchema);
