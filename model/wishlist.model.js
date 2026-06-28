@@ -1,21 +1,16 @@
-import mongoose, { Schema } from "mongoose";
+import mongoose, { Schema } from 'mongoose';
 
 const wishlistSchema = new Schema(
   {
     user: {
       type: Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
       unique: true,
     },
-    products: [
-      {
-        type: Schema.Types.ObjectId,
-        ref: "Product",
-      },
-    ],
+    products: [{ type: String }], // Shopify product IDs
   },
   { timestamps: true }
 );
 
-export const Wishlist = mongoose.model("Wishlist", wishlistSchema);
+export const Wishlist = mongoose.model('Wishlist', wishlistSchema);
