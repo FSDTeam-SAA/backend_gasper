@@ -1,0 +1,874 @@
+{
+  "info": {
+    "_postman_id": "gasper-backend-v2",
+    "name": "Gasper Backend API",
+    "description": "Full API collection for Gasper backend with Shopify integration.\n\n**Setup:**\n1. Set `baseUrl` variable to your server (default: http://localhost:5010/api/v1)\n2. Run **Auth > Register** then **Auth > Login** — the token is saved automatically.\n3. For Cart/Order/Review endpoints use the `shopifyProductId` and `variantId` from the Products endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl",         "value": "http://localhost:5010/api/v1", "type": "string" },
+    { "key": "token",           "value": "", "type": "string" },
+    { "key": "refreshToken",    "value": "", "type": "string" },
+    { "key": "shopifyProductId","value": "REPLACE_WITH_SHOPIFY_PRODUCT_ID", "type": "string" },
+    { "key": "variantId",       "value": "REPLACE_WITH_SHOPIFY_VARIANT_ID", "type": "string" },
+    { "key": "shopifyOrderId",  "value": "", "type": "string" },
+    { "key": "categoryId",      "value": "", "type": "string" },
+    { "key": "addressId",       "value": "", "type": "string" },
+    { "key": "couponId",        "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"email\": \"john@example.com\",\n  \"password\": \"Password123!\",\n  \"username\": \"johndoe\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.data?.accessToken)  pm.collectionVariables.set('token', json.data.accessToken);",
+                  "if (json.data?.refreshToken) pm.collectionVariables.set('refreshToken', json.data.refreshToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\",\n  \"password\": \"Password123!\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Verify OTP",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/verify",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\",\n  \"otp\": \"123456\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Forgot Password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/forget",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/reset-password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\",\n  \"otp\": \"123456\",\n  \"newPassword\": \"NewPassword123!\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/auth/change-password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"oldPassword\": \"Password123!\",\n  \"newPassword\": \"NewPassword456!\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/refresh-token",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/auth/logout"
+          }
+        }
+      ]
+    },
+    {
+      "name": "User",
+      "item": [
+        {
+          "name": "Get Profile",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/user/profile"
+          }
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/user/profile",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "firstName", "value": "John", "type": "text" },
+                { "key": "lastName",  "value": "Doe",  "type": "text" },
+                { "key": "phone",     "value": "+1234567890", "type": "text" },
+                { "key": "bio",       "value": "Hello world", "type": "text" },
+                { "key": "avatar",    "type": "file", "src": "" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Change Password (User Route)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/user/password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"oldPassword\": \"Password123!\",\n  \"newPassword\": \"NewPassword456!\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Products (Shopify)",
+      "description": "Products are fetched live from Shopify. No add/edit/delete from this API.",
+      "item": [
+        {
+          "name": "Get All Products",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/product?limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["product"],
+              "query": [
+                { "key": "limit",    "value": "20", "description": "Max 250 (Shopify limit)" },
+                { "key": "pageInfo", "value": "", "description": "Shopify cursor for next/prev page", "disabled": true },
+                { "key": "category", "value": "", "description": "Filter by Shopify product_type", "disabled": true },
+                { "key": "brand",    "value": "", "description": "Filter by Shopify vendor", "disabled": true },
+                { "key": "search",   "value": "", "description": "Client-side title/brand search", "disabled": true },
+                { "key": "sort",     "value": "latest", "description": "latest | oldest | title_asc | title_desc", "disabled": true },
+                { "key": "type",     "value": "", "description": "featured | popular", "disabled": true },
+                { "key": "minPrice", "value": "", "disabled": true },
+                { "key": "maxPrice", "value": "", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Product by Shopify ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/product/{{shopifyProductId}}"
+          }
+        },
+        {
+          "name": "Get All Brands",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/product/brands"
+          }
+        },
+        {
+          "name": "Get Products by Brand",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/product/brand/Nike"
+          }
+        },
+        {
+          "name": "New Arrivals",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/product/new-arrivals?limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["product", "new-arrivals"],
+              "query": [
+                { "key": "limit",    "value": "20" },
+                { "key": "pageInfo", "value": "", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Featured Products",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/product?type=featured&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["product"],
+              "query": [
+                { "key": "type",  "value": "featured" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Popular Products",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/product?type=popular&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["product"],
+              "query": [
+                { "key": "type",  "value": "popular" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cart",
+      "description": "Cart stores Shopify product IDs and variant IDs. Get the shopifyProductId and variantId from the Products endpoints first.",
+      "item": [
+        {
+          "name": "Add to Cart",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/cart/add",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shopifyProductId\": \"{{shopifyProductId}}\",\n  \"variantId\": \"{{variantId}}\",\n  \"quantity\": 1\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Cart",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/cart"
+          }
+        },
+        {
+          "name": "Update Cart Item",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/cart/update",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shopifyProductId\": \"{{shopifyProductId}}\",\n  \"variantId\": \"{{variantId}}\",\n  \"quantity\": 3\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Set quantity to 0 or less to remove the item from the cart."
+          }
+        },
+        {
+          "name": "Remove Item from Cart",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/cart/update",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shopifyProductId\": \"{{shopifyProductId}}\",\n  \"variantId\": \"{{variantId}}\",\n  \"quantity\": 0\n}"
+            }
+          }
+        },
+        {
+          "name": "Clear Cart",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/cart/clear"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Wishlist",
+      "item": [
+        {
+          "name": "Add to Wishlist",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/wishlist/add",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shopifyProductId\": \"{{shopifyProductId}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Wishlist",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/wishlist",
+            "description": "Returns an array of Shopify product IDs. Fetch product details from GET /product/:id."
+          }
+        },
+        {
+          "name": "Remove from Wishlist",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/wishlist/{{shopifyProductId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Orders (Shopify)",
+      "description": "Orders are created and fetched from Shopify. Use variantId from the product variants array.",
+      "item": [
+        {
+          "name": "Create Order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.data?.id) pm.collectionVariables.set('shopifyOrderId', json.data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/order/create",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"variantId\": \"{{variantId}}\",\n      \"quantity\": 1\n    }\n  ],\n  \"address\": {\n    \"firstName\": \"John\",\n    \"lastName\": \"Doe\",\n    \"street\": \"123 Main Street\",\n    \"city\": \"New York\",\n    \"postalCode\": \"10001\",\n    \"country\": \"US\",\n    \"phone\": \"+1234567890\"\n  },\n  \"note\": \"Please gift wrap\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get My Orders",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/order",
+              "host": ["{{baseUrl}}"],
+              "path": ["order"],
+              "query": [
+                { "key": "status", "value": "any", "description": "any | open | closed | cancelled", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Order by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/order/{{shopifyOrderId}}"
+          }
+        },
+        {
+          "name": "Cancel Order",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/order/{{shopifyOrderId}}/cancel"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reviews",
+      "description": "productId is now the Shopify product ID (string number like '8765432100'), not a MongoDB ID.",
+      "item": [
+        {
+          "name": "Add Review",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/reviews",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{shopifyProductId}}\",\n  \"rating\": 4,\n  \"text\": \"Great product, highly recommend!\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get My Reviews",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/reviews/me"
+          }
+        },
+        {
+          "name": "Get Product Reviews",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/reviews/product/{{shopifyProductId}}?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["reviews", "product", "{{shopifyProductId}}"],
+              "query": [
+                { "key": "page",  "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update My Review",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/reviews/{{shopifyProductId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 5,\n  \"text\": \"Updated: Even better than I thought!\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete My Review",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/reviews/{{shopifyProductId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Category",
+      "item": [
+        {
+          "name": "Add Category",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.data?._id) pm.collectionVariables.set('categoryId', json.data._id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/category/add",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "name",   "value": "Clothing",  "type": "text" },
+                { "key": "parent", "value": "",           "type": "text", "disabled": true },
+                { "key": "image",  "type": "file", "src": "" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Categories",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/category",
+              "host": ["{{baseUrl}}"],
+              "path": ["category"],
+              "query": [
+                { "key": "parent",          "value": "null", "description": "null for root categories", "disabled": true },
+                { "key": "includeProducts", "value": "true", "description": "Fetches matching products from Shopify", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Category Tree",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/category/tree/all"
+          }
+        },
+        {
+          "name": "Update Category",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/category/{{categoryId}}",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "name", "value": "Clothing Updated", "type": "text" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Category",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/category/{{categoryId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Address",
+      "item": [
+        {
+          "name": "Add Address",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.data?._id) pm.collectionVariables.set('addressId', json.data._id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/address/add",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"street\": \"123 Main Street\",\n  \"city\": \"New York\",\n  \"postalCode\": \"10001\",\n  \"country\": \"US\",\n  \"isDefault\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Addresses",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/address"
+          }
+        },
+        {
+          "name": "Update Address",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/address/{{addressId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"street\": \"456 Oak Avenue\",\n  \"city\": \"Los Angeles\",\n  \"postalCode\": \"90001\",\n  \"country\": \"US\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Address",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/address/{{addressId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Coupon",
+      "item": [
+        {
+          "name": "Create Coupon",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.data?._id) pm.collectionVariables.set('couponId', json.data._id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/coupon/create",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"SAVE20\",\n  \"discount\": 20,\n  \"expiryDate\": \"2026-12-31\",\n  \"usageLimit\": 100\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Coupons",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/coupon"
+          }
+        },
+        {
+          "name": "Validate Coupon",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/coupon/validate",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"SAVE20\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Coupon",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/coupon/{{couponId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"discount\": 25,\n  \"usageLimit\": 200\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Coupon",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/coupon/{{couponId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payment",
+      "item": [
+        {
+          "name": "Create Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/payment/create-payment",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 99.99,\n  \"currency\": \"usd\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Confirm Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/payment/confirm-payment",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"paymentIntentId\": \"pi_REPLACE_WITH_INTENT_ID\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Vendor",
+      "item": [
+        {
+          "name": "Become a Vendor",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/vendor/become",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "storeName",   "value": "My Awesome Store",   "type": "text" },
+                { "key": "description", "value": "We sell great stuff", "type": "text" },
+                { "key": "phone",       "value": "+1234567890",         "type": "text" },
+                { "key": "address",     "value": "123 Main St",         "type": "text" },
+                { "key": "city",        "value": "New York",            "type": "text" },
+                { "key": "postalCode",  "value": "10001",               "type": "text" },
+                { "key": "country",     "value": "US",                  "type": "text" },
+                { "key": "taxId",       "value": "TAX123",              "type": "text" },
+                { "key": "logo",    "type": "file", "src": "" },
+                { "key": "license", "type": "file", "src": "" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Vendor List",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/vendor"
+          }
+        },
+        {
+          "name": "Get Vendor by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/vendor/REPLACE_VENDOR_USER_ID"
+          }
+        },
+        {
+          "name": "Approve Vendor (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/vendor/REPLACE_VENDOR_USER_ID/approve"
+          }
+        },
+        {
+          "name": "Get Inventory (Shopify)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/vendor/inventory",
+            "description": "Returns Shopify products where vendor = your storeName. Requires approved vendor account."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Contact Us",
+      "item": [
+        {
+          "name": "Create Contact Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/contact-us/create",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"Order Issue\",\n  \"message\": \"I have a problem with my recent order.\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get All Contact Messages (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/contact-us"
+          }
+        },
+        {
+          "name": "Get Contact Message by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/contact-us/REPLACE_CONTACT_ID"
+          }
+        },
+        {
+          "name": "Delete Contact Message",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/contact-us/REPLACE_CONTACT_ID"
+          }
+        }
+      ]
+    }
+  ]
+}
