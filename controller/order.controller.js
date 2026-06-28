@@ -1,150 +1,81 @@
-import httpStatus from "http-status";
-import { Order as OrderModel } from "../model/order.model.js";
-import AppError from "../errors/AppError.js";
-import sendResponse from "../utils/sendResponse.js";
-import catchAsync from "../utils/catchAsync.js";
-import { nanoid } from "nanoid";
-import { Product } from "../model/product.model.js";
+import httpStatus from 'http-status';
+import AppError from '../errors/AppError.js';
+import sendResponse from '../utils/sendResponse.js';
+import catchAsync from '../utils/catchAsync.js';
+import {
+  createShopifyOrder,
+  fetchOrdersByEmail,
+  fetchOrderById,
+  cancelShopifyOrder,
+} from '../utils/shopify.service.js';
 
 export const createOrder = catchAsync(async (req, res) => {
-  const { items, address, coupon } = req.body;
-  const customer = req.user._id;
+  const { items, address, note } = req.body;
+  // items: [{ variantId, quantity }]
 
-  let totalAmount = 0;
-  const orderItems = [];
-  for (let item of items) {
-    const product = await Product.findById(item.product);
-    if (!product || product.stock < item.quantity) {
-      throw new AppError(
-        httpStatus.BAD_REQUEST,
-        `Insufficient stock for ${product?.title}`
-      );
-    }
-    totalAmount += product.price * item.quantity;
-    orderItems.push({
-      product: item.product,
-      quantity: item.quantity,
-      price: product.price,
-      vendor: product.vendor,
-    });
-
-    // Update stock
-    product.stock -= item.quantity;
-    await product.save();
+  if (!items || !items.length) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'Order must have at least one item');
+  }
+  if (!address) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'Shipping address is required');
   }
 
-  let discount = 0;
-  if (coupon) {
-    // Validate coupon logic here
-    discount = totalAmount * 0.2;
-    totalAmount -= discount;
-  }
-
-  const orderId = `ORD${nanoid(6)}`;
-
-  const order = await OrderModel.create({
-    orderId,
-    items: orderItems,
-    totalAmount,
-    discount,
-    customer,
-    vendor: orderItems[0].vendor,
-    address,
-    coupon,
-    expectedDeliveryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+  const order = await createShopifyOrder({
+    email: req.user.email,
+    lineItems: items,
+    shippingAddress: address,
+    note,
   });
 
   sendResponse(res, {
     statusCode: httpStatus.CREATED,
     success: true,
-    message: "Order created",
+    message: 'Order created',
     data: order,
   });
 });
 
 export const getOrders = catchAsync(async (req, res) => {
-  const { status, page = 1, limit = 10 } = req.query;
-  const query = { customer: req.user._id };
-  if (status) query.status = status;
+  const { status } = req.query;
 
-  if (req.user.role === "manager") {
-    query.vendor = req.user._id;
-    delete query.customer;
-  } else if (req.user.role === "admin") {
-    delete query.customer;
-  }
+  // Admin sees all orders, users see only their own
+  const email = req.user.role === 'admin' ? undefined : req.user.email;
 
-  const orders = await OrderModel.find(query)
-    .populate("items.product", "title price photos")
-    .populate("customer", "name email")
-    .populate("vendor", "name storeName")
-    .limit(limit * 1)
-    .skip((page - 1) * limit)
-    .sort({ createdAt: -1 });
+  const orders = await fetchOrdersByEmail(email || '', {
+    status: status || 'any',
+  });
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: "Orders fetched",
+    message: 'Orders fetched',
     data: orders,
   });
 });
 
 export const getOrderById = catchAsync(async (req, res) => {
-  const order = await OrderModel.findOne({ orderId: req.params.orderId })
-    .populate("items.product", "title price photos")
-    .populate("customer", "name email")
-    .populate("vendor", "name storeName");
+  const order = await fetchOrderById(req.params.orderId);
+  if (!order) throw new AppError(httpStatus.NOT_FOUND, 'Order not found');
 
-  console.log(order);
-  console.log(req.user._id);
-  if (!order) throw new AppError(httpStatus.NOT_FOUND, "Order not found");
-
-  // Role check for access
-  if (
-    req.user.role === "user" &&
-    order.customer._id.toString() !== req.user._id.toString()
-  ) {
-    throw new AppError(httpStatus.FORBIDDEN, "Access denied");
-  }
-  if (
-    req.user.role === "manager" &&
-    order.vendor.toString() !== req.user._id.toString()
-  ) {
-    throw new AppError(httpStatus.FORBIDDEN, "Access denied");
+  if (req.user.role === 'user' && order.email !== req.user.email) {
+    throw new AppError(httpStatus.FORBIDDEN, 'Access denied');
   }
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: "Order fetched",
+    message: 'Order fetched',
     data: order,
   });
 });
 
-export const updateOrderStatus = catchAsync(async (req, res) => {
-  if (req.user.role !== "manager" && req.user.role !== "admin") {
-    throw new AppError(
-      httpStatus.FORBIDDEN,
-      "Only managers/admins can update status"
-    );
-  }
-
-  const { status, trackingNumber } = req.body;
-  const order = await OrderModel.findOneAndUpdate(
-    { orderId: req.params.orderId },
-    { status, trackingNumber },
-    { new: true }
-  ).populate("items.product");
-
-  if (!order || order.vendor.toString() !== req.user._id.toString()) {
-    throw new AppError(httpStatus.FORBIDDEN, "Access denied");
-  }
+export const cancelOrder = catchAsync(async (req, res) => {
+  const order = await cancelShopifyOrder(req.params.orderId);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: "Order status updated",
+    message: 'Order cancelled',
     data: order,
   });
 });
