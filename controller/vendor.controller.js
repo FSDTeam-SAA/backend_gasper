@@ -4,7 +4,7 @@ import { uploadOnCloudinary } from "../utils/commonMethod.js";
 import AppError from "../errors/AppError.js";
 import sendResponse from "../utils/sendResponse.js";
 import catchAsync from "../utils/catchAsync.js";
-import { Product } from "../model/product.model.js";
+import { fetchProductsByVendor } from "../utils/shopify.service.js";
 
 export const becomeVendor = catchAsync(async (req, res) => {
   const {
@@ -21,17 +21,14 @@ export const becomeVendor = catchAsync(async (req, res) => {
   } = req.body;
 
   const userId = req.user._id;
-
   const user = await User.findById(userId);
 
-  // Upload files
-  let storeLogo = user.avatar; // Existing
+  let storeLogo = user.avatar;
   if (req.files?.logo) {
     const upload = await uploadOnCloudinary(req.files.logo[0].buffer);
     storeLogo = { public_id: upload.public_id, url: upload.secure_url };
   }
 
-  // validate if already a vendor
   if (user.role === "manager" && user.vendorStatus === "approved") {
     throw new AppError(httpStatus.BAD_REQUEST, "User is already a vendor");
   }
@@ -55,7 +52,6 @@ export const becomeVendor = catchAsync(async (req, res) => {
   user.postalCode = postalCode;
   user.country = country;
   user.phone = phone;
-
   user.vendorStatus = "pending";
 
   await user.save();
@@ -68,7 +64,6 @@ export const becomeVendor = catchAsync(async (req, res) => {
   });
 });
 
-// Admin approve vendor (from vendor list)
 export const approveVendor = catchAsync(async (req, res) => {
   const user = await User.findByIdAndUpdate(
     req.params.userId,
@@ -84,34 +79,26 @@ export const approveVendor = catchAsync(async (req, res) => {
   });
 });
 
+// Returns this vendor's products from Shopify (matched by storeName = Shopify vendor field)
 export const getInventory = catchAsync(async (req, res) => {
-  const inventory = await Product.find({ vendor: req.user._id })
-    .select("title sku stock status")
-    .sort({ stock: 1 });
+  const user = await User.findById(req.user._id);
+  if (!user.storeName) {
+    throw new AppError(httpStatus.BAD_REQUEST, "No store name configured for this vendor");
+  }
+
+  const products = await fetchProductsByVendor(user.storeName);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
     message: "Inventory fetched",
-    data: inventory,
-  });
-});
-
-export const updateStock = catchAsync(async (req, res) => {
-  const { stock } = req.body;
-  const product = await Product.findOneAndUpdate(
-    { _id: req.params.id, vendor: req.user._id },
-    { stock },
-    { new: true }
-  );
-
-  if (!product) throw new AppError(httpStatus.NOT_FOUND, "Product not found");
-
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: "Stock updated",
-    data: product,
+    data: products.map(p => ({
+      shopifyId: p.shopifyId,
+      title: p.title,
+      sku: p.sku,
+      stock: p.stock,
+      status: p.status,
+    })),
   });
 });
 

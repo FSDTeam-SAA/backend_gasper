@@ -5,7 +5,6 @@ import {
   approveVendor,
   becomeVendor,
   getVendorList,
-  updateStock,
   getInventory,
   getVendorById,
 } from "../controller/vendor.controller.js";
@@ -24,11 +23,8 @@ router.post(
 );
 
 router.get("/", protect, getVendorList);
-// static routes first to avoid param routes (/:userId) catching them
 router.get("/inventory", protect, getInventory);
-router.patch("/stock/:productId", protect, updateStock);
 
-// param routes after static routes
 router.get("/:userId", protect, getVendorById);
 router.patch("/:userId/approve", protect, approveVendor);
 
