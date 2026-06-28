@@ -105,8 +105,7 @@ const userSchema = new Schema(
           default: 0,
         },
         product: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "Product",
+          type: String, // Shopify product ID
         },
         text: {
           type: String,
