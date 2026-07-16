@@ -1,6 +1,10 @@
 import mongoose, { Schema } from 'mongoose';
 
 const cartItemSchema = new Schema({
+  lineId: {
+    type: String,
+    default: '',
+  },
   shopifyProductId: {
     type: String,
     required: true,
@@ -19,7 +23,12 @@ const cartItemSchema = new Schema({
     required: true,
   },
   title: { type: String, default: '' },
+  variantTitle: { type: String, default: '' },
   image: { type: String, default: '' },
+  total: { type: Number, default: 0 },
+  currencyCode: { type: String, default: '' },
+  quantityAvailable: { type: Number, default: -1 },
+  availableForSale: { type: Boolean, default: true },
 });
 
 const cartSchema = new Schema(
@@ -31,7 +40,27 @@ const cartSchema = new Schema(
       unique: true,
     },
     items: [cartItemSchema],
+    shopifyCartId: {
+      type: String,
+      default: '',
+    },
+    checkoutUrl: {
+      type: String,
+      default: '',
+    },
     totalAmount: {
+      type: Number,
+      default: 0,
+    },
+    subtotalAmount: {
+      type: Number,
+      default: 0,
+    },
+    currencyCode: {
+      type: String,
+      default: '',
+    },
+    totalQuantity: {
       type: Number,
       default: 0,
     },
