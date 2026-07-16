@@ -9,6 +9,7 @@ import {
   createLogoutUrl,
   exchangeAuthorizationCode,
   fetchShopifyCustomer,
+  storeShopifyCustomerTokens,
 } from "../utils/shopify.customer.service.js";
 
 async function upsertShopifyUser(customer) {
@@ -102,6 +103,7 @@ export const completeShopifyCustomerAuth = catchAsync(async (req, res, next) => 
   const tokenData = await exchangeAuthorizationCode({ code, state });
   const customer = await fetchShopifyCustomer(tokenData.access_token);
   const user = await upsertShopifyUser(customer);
+  await storeShopifyCustomerTokens(user._id, tokenData);
   const appTokens = await issueAppTokens(user, res);
 
   sendResponse(res, {

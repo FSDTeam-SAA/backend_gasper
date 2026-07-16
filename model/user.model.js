@@ -24,6 +24,24 @@ const userSchema = new Schema(
       index: true,
       sparse: true,
     },
+    // Customer Account OAuth credentials are encrypted before persistence and
+    // excluded from normal queries so they can never leak through profile APIs.
+    shopifyCustomerAccessToken: {
+      type: String,
+      select: false,
+    },
+    shopifyCustomerRefreshToken: {
+      type: String,
+      select: false,
+    },
+    shopifyCustomerIdToken: {
+      type: String,
+      select: false,
+    },
+    shopifyCustomerAccessTokenExpiresAt: {
+      type: Date,
+      select: false,
+    },
     authProvider: {
       type: String,
       enum: ["local", "shopify"],

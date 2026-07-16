@@ -8,6 +8,52 @@ import {
   fetchOrderById,
   cancelShopifyOrder,
 } from '../utils/shopify.service.js';
+import {
+  fetchShopifyCustomerOrder,
+  fetchShopifyCustomerOrders,
+} from '../utils/shopify.customer.service.js';
+
+export const getCustomerOrderHistory = catchAsync(async (req, res) => {
+  if (req.user.authProvider !== 'shopify') {
+    throw new AppError(
+      httpStatus.UNAUTHORIZED,
+      'Please sign in with Shopify to view Shopify order history'
+    );
+  }
+
+  const history = await fetchShopifyCustomerOrders(req.user._id, {
+    first: req.query.limit,
+    after: req.query.after,
+  });
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Shopify customer orders fetched',
+    data: history,
+  });
+});
+
+export const getCustomerOrder = catchAsync(async (req, res) => {
+  if (req.user.authProvider !== 'shopify') {
+    throw new AppError(
+      httpStatus.UNAUTHORIZED,
+      'Please sign in with Shopify to view this order'
+    );
+  }
+
+  const order = await fetchShopifyCustomerOrder(
+    req.user._id,
+    decodeURIComponent(req.params.orderId)
+  );
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Shopify customer order fetched',
+    data: order,
+  });
+});
 
 export const createOrder = catchAsync(async (req, res) => {
   const { items, address, note } = req.body;
