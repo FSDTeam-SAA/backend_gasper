@@ -16,6 +16,19 @@ const userSchema = new Schema(
       type: String,
       trim: true,
     },
+    // Shopify Customer Account identity. Passwords remain optional for
+    // Shopify-authenticated users and are not populated by the OAuth flow.
+    shopifyCustomerId: {
+      type: String,
+      trim: true,
+      index: true,
+      sparse: true,
+    },
+    authProvider: {
+      type: String,
+      enum: ["local", "shopify"],
+      default: "local",
+    },
     password: { type: String },
     username: {
       type: String,
