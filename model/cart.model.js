@@ -31,6 +31,14 @@ const cartItemSchema = new Schema({
   availableForSale: { type: Boolean, default: true },
 });
 
+const cartWarningSchema = new Schema(
+  {
+    code: { type: String, default: '' },
+    message: { type: String, default: '' },
+  },
+  { _id: false }
+);
+
 const cartSchema = new Schema(
   {
     user: {
@@ -63,6 +71,10 @@ const cartSchema = new Schema(
     totalQuantity: {
       type: Number,
       default: 0,
+    },
+    warnings: {
+      type: [cartWarningSchema],
+      default: [],
     },
   },
   { timestamps: true }

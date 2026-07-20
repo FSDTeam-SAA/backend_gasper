@@ -128,16 +128,22 @@ function getMutationCart(data, operationName) {
     throw new AppError(httpStatus.BAD_GATEWAY, "Shopify cart was not returned");
   }
 
+  payload.cart.storefrontWarnings = payload.warnings || [];
   return payload.cart;
 }
 
 export async function createStorefrontCart({
   merchandiseId,
   quantity = 1,
+  lines: requestedLines,
   email,
   buyerIp,
 } = {}) {
-  const lines = merchandiseId ? [{ merchandiseId, quantity }] : [];
+  const lines = Array.isArray(requestedLines)
+    ? requestedLines
+    : merchandiseId
+      ? [{ merchandiseId, quantity }]
+      : [];
   const buyerIdentity = email ? { email } : undefined;
   const data = await storefrontRequest(
     `${CART_FRAGMENT}
